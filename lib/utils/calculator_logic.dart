@@ -1,58 +1,31 @@
-// lib/utils/calculator_logic.dart
 
 import 'dart:math' as math;
 import '../models/calculator_mode.dart';
 
-/// Pure calculation logic — no Flutter dependencies.
-/// All public methods are static so they are easily unit-testable.
 class CalculatorLogic {
 
-  /// Evaluates a mathematical expression string and returns a double.
-  /// Throws [FormatException] for invalid expressions.
   static double evaluate(String expression,
       {AngleMode angleMode = AngleMode.degrees}) {
     final cleaned = _preprocess(expression, angleMode);
-    return _parse(cleaned);
+    return _parse(cleaned, angleMode);
   }
 
-  /// Pre-processes the raw expression string before parsing.
   static String _preprocess(String expr, AngleMode mode) {
     String e = expr
+        .replaceAll(RegExp(r'[\u00A0\u200B\u200C\u200D\uFEFF\u2060]'), '')
         .replaceAll('×', '*')
         .replaceAll('÷', '/')
+        .replaceAll('−', '-')
         .replaceAll('π', '${math.pi}')
-        // implicit multiplication: digit followed by '('
-        .replaceAllMapped(RegExp(r'(\d)\('), (m) => '${m[1]}*(');
+        .replaceAllMapped(RegExp(r'(\d)\('), (m) => '${m[1]}*(')
+        .replaceAllMapped(RegExp(r'(\d)([a-zA-Z])'), (m) => '${m[1]}*${m[2]}')
+        .replaceAllMapped(RegExp(r'\)(\()'), (m) => ')*(')
+        .replaceAllMapped(RegExp(r'\)([a-zA-Z])'), (m) => ')*${m[2]}');
 
-    // Do NOT replace bare 'e' — it is a function name suffix or Euler number
-    // handled separately via the constants path in the provider.
-
-    // Wrap trig arguments in deg→rad conversion when needed
-    if (mode == AngleMode.degrees) {
-      final inverseFns = ['asin', 'acos', 'atan'];
-      final directFns  = ['sin', 'cos', 'tan'];
-
-      for (final fn in inverseFns) {
-        e = e.replaceAllMapped(
-          RegExp('$fn\\(([^)]+)\\)'),
-          (m) => '(${m[1]}*(${180 / math.pi}))',  // result in degrees
-        );
-      }
-      for (final fn in directFns) {
-        e = e.replaceAllMapped(
-          RegExp('$fn\\(([^)]+)\\)'),
-          (m) => '$fn(${m[1]}*(${math.pi / 180}))',
-        );
-      }
-    }
     return e;
   }
 
-  /// Recursive-descent parser implementing PEMDAS/BODMAS.
-  /// Uses `late` function variables so mutually-recursive closures can
-  /// reference each other without triggering Dart's
-  /// "can't be referenced before it is declared" error.
-  static double _parse(String expr) {
+  static double _parse(String expr, AngleMode angleMode) {
     final tokens = _tokenize(expr.trim());
     int pos = 0;
 
@@ -63,12 +36,41 @@ class CalculatorLogic {
     late double Function() parseUnary;
     late double Function() parsePrimary;
 
+    final bool isDeg = angleMode == AngleMode.degrees;
+    final Map<String, double Function(double)> fnMap = {
+      'sin':   (x) => math.sin(isDeg ? x * math.pi / 180 : x),
+      'cos':   (x) => math.cos(isDeg ? x * math.pi / 180 : x),
+      'tan':   (x) => math.tan(isDeg ? x * math.pi / 180 : x),
+      'asin':  (x) => isDeg ? math.asin(x) * 180 / math.pi : math.asin(x),
+      'acos':  (x) => isDeg ? math.acos(x) * 180 / math.pi : math.acos(x),
+      'atan':  (x) => isDeg ? math.atan(x) * 180 / math.pi : math.atan(x),
+      'ln':    (x) {
+        if (x <= 0) throw FormatException('ln domain error');
+        return math.log(x);
+      },
+      'log':   (x) {
+        if (x <= 0) throw FormatException('log domain error');
+        return math.log(x) / math.ln10;
+      },
+      'log2':  (x) {
+        if (x <= 0) throw FormatException('log2 domain error');
+        return math.log(x) / math.log2e;
+      },
+      'sqrt':  (x) {
+        if (x < 0) throw FormatException('sqrt of negative');
+        return math.sqrt(x);
+      },
+      'cbrt':  (x) => x < 0 ? -math.pow(-x, 1 / 3).toDouble() : math.pow(x, 1 / 3).toDouble(),
+      'abs':   (x) => x.abs(),
+      'ceil':  (x) => x.ceilToDouble(),
+      'floor': (x) => x.floorToDouble(),
+    };
+
     parsePrimary = () {
       if (pos >= tokens.length) throw FormatException('Unexpected end of expression');
 
       final tok = tokens[pos];
 
-      // Parenthesised sub-expression
       if (tok == '(') {
         pos++;
         final val = parseExpr();
@@ -76,70 +78,50 @@ class CalculatorLogic {
           throw FormatException('Missing closing parenthesis');
         }
         pos++;
-        return val;
+        double result = val;
+        while (pos < tokens.length && tokens[pos] == '!') {
+          pos++;
+          if (result != result.truncateToDouble() || result < 0) {
+            throw FormatException('Factorial requires a non-negative integer');
+          }
+          result = _factorial(result.toInt()).toDouble();
+        }
+        return result;
       }
-
-      // Built-in math functions
-      final Map<String, double Function(double)> fnMap = {
-        'sin':   (x) => math.sin(x),
-        'cos':   (x) => math.cos(x),
-        'tan':   (x) => math.tan(x),
-        'asin':  (x) => math.asin(x),
-        'acos':  (x) => math.acos(x),
-        'atan':  (x) => math.atan(x),
-        'ln':    (x) {
-          if (x <= 0) throw FormatException('ln domain error');
-          return math.log(x);
-        },
-        'log':   (x) {
-          if (x <= 0) throw FormatException('log domain error');
-          return math.log(x) / math.ln10;
-        },
-        'log2':  (x) {
-          if (x <= 0) throw FormatException('log2 domain error');
-          return math.log(x) / math.log2e;
-        },
-        'sqrt':  (x) {
-          if (x < 0) throw FormatException('sqrt of negative');
-          return math.sqrt(x);
-        },
-        'cbrt':  (x) => math.pow(x, 1 / 3).toDouble(),
-        'abs':   (x) => x.abs(),
-        'ceil':  (x) => x.ceilToDouble(),
-        'floor': (x) => x.floorToDouble(),
-      };
 
       if (fnMap.containsKey(tok)) {
         pos++;
         if (pos >= tokens.length || tokens[pos] != '(') {
           throw FormatException('Expected "(" after $tok');
         }
-        pos++; // consume '('
+        pos++;
         final arg = parseExpr();
         if (pos >= tokens.length || tokens[pos] != ')') {
           throw FormatException('Missing ")" after $tok argument');
         }
-        pos++; // consume ')'
+        pos++;
         return fnMap[tok]!(arg);
       }
 
-      // Number literal
       final value = double.tryParse(tok);
       if (value == null) throw FormatException('Unknown token: $tok');
       pos++;
 
-      // Factorial '!'
-      if (pos < tokens.length && tokens[pos] == '!') {
+      double result = value;
+      while (pos < tokens.length && tokens[pos] == '!') {
         pos++;
-        return _factorial(value.toInt()).toDouble();
+        if (result != result.truncateToDouble() || result < 0) {
+          throw FormatException('Factorial requires a non-negative integer');
+        }
+        result = _factorial(result.toInt()).toDouble();
       }
-      return value;
+      return result;
     };
 
     parseUnary = () {
       if (pos < tokens.length && tokens[pos] == '-') {
         pos++;
-        return -parsePrimary();
+        return -parsePower();
       }
       if (pos < tokens.length && tokens[pos] == '+') {
         pos++;
@@ -148,21 +130,21 @@ class CalculatorLogic {
     };
 
     parsePower = () {
-      double base = parseUnary();
+      double base = parsePrimary();
       if (pos < tokens.length && tokens[pos] == '^') {
         pos++;
-        final exp = parsePower(); // right-associative
+        final exp = parseUnary();
         base = math.pow(base, exp).toDouble();
       }
       return base;
     };
 
     parseMulDiv = () {
-      double left = parsePower();
+      double left = parseUnary();
       while (pos < tokens.length &&
           (tokens[pos] == '*' || tokens[pos] == '/')) {
         final op = tokens[pos++];
-        final right = parsePower();
+        final right = parseUnary();
         if (op == '/' && right == 0) {
           throw FormatException('Division by zero');
         }
@@ -191,7 +173,6 @@ class CalculatorLogic {
     return result;
   }
 
-  /// Converts an expression string into a flat list of tokens.
   static List<String> _tokenize(String expr) {
     final tokens = <String>[];
     int i = 0;
@@ -199,16 +180,18 @@ class CalculatorLogic {
       final ch = expr[i];
       if (ch == ' ') { i++; continue; }
 
-      // Number (integer or decimal, possibly with leading minus handled by unary)
       if (RegExp(r'[\d.]').hasMatch(ch)) {
-        int j = i;
-        while (j < expr.length && RegExp(r'[\d.]').hasMatch(expr[j])) j++;
-        tokens.add(expr.substring(i, j));
-        i = j;
+        final match = RegExp(r'\d*\.?\d+(?:[eE][-+]?\d+)?').firstMatch(expr.substring(i));
+        if (match != null) {
+          tokens.add(match.group(0)!);
+          i += match.group(0)!.length;
+        } else {
+          tokens.add(ch);
+          i++;
+        }
         continue;
       }
 
-      // Identifier / function name
       if (RegExp(r'[a-zA-Z_]').hasMatch(ch)) {
         int j = i;
         while (j < expr.length && RegExp(r'[a-zA-Z0-9_]').hasMatch(expr[j])) j++;
@@ -223,7 +206,6 @@ class CalculatorLogic {
     return tokens;
   }
 
-  // ── Factorial ─────────────────────────────────────────────────────────────
   static int _factorial(int n) {
     if (n < 0) throw FormatException('Factorial of negative number');
     if (n == 0 || n == 1) return 1;
@@ -232,11 +214,9 @@ class CalculatorLogic {
     return result;
   }
 
-  // ── Memory helpers ────────────────────────────────────────────────────────
   static double memoryAdd(double current, double value) => current + value;
   static double memorySubtract(double current, double value) => current - value;
 
-  // ── Programmer mode helpers ───────────────────────────────────────────────
   static String toBinary(int value) => value.toRadixString(2).toUpperCase();
   static String toOctal(int value)  => value.toRadixString(8).toUpperCase();
   static String toHex(int value)    => value.toRadixString(16).toUpperCase();
@@ -248,24 +228,19 @@ class CalculatorLogic {
   static int shiftLeft(int a, int n)  => a << n;
   static int shiftRight(int a, int n) => a >> n;
 
-  // ── Result formatting ─────────────────────────────────────────────────────
-  /// Formats a double result, removing trailing zeros.
   static String formatResult(double value, {int precision = 10}) {
     if (value.isNaN) return 'Error';
     if (value.isInfinite) return value > 0 ? '∞' : '-∞';
 
-    // Integer check
     if (value == value.truncateToDouble()) {
       final asInt = value.toInt();
-      if (asInt.abs() < 1000000000000000) return asInt.toString();
+      if (asInt.abs() < 100000000000000) return asInt.toString();
     }
 
-    // Scientific notation for very large or very small numbers
-    if (value.abs() >= 1e15 || (value.abs() < 1e-6 && value != 0)) {
+    if (value.abs() >= 1e14 || (value.abs() < 1e-6 && value != 0)) {
       return value.toStringAsExponential(precision);
     }
 
-    // Fixed point with trimmed trailing zeros
     final formatted = value.toStringAsFixed(precision);
     if (formatted.contains('.')) {
       final trimmed = formatted.replaceAll(RegExp(r'0+$'), '');
