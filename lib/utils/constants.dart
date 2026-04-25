@@ -1,17 +1,14 @@
-// lib/utils/constants.dart
+
 
 import 'package:flutter/material.dart';
 
-// ─── Colors ──────────────────────────────────────────────────────────────────
 class AppColors {
-  // Light Theme
   static const Color lightPrimary   = Color(0xFF1E1E1E);
   static const Color lightSecondary = Color(0xFF424242);
   static const Color lightAccent    = Color(0xFFFF6B6B);
   static const Color lightBg        = Color(0xFFF5F5F5);
   static const Color lightDisplay   = Color(0xFFFFFFFF);
 
-  // Dark Theme
   static const Color darkPrimary   = Color(0xFF121212);
   static const Color darkSecondary = Color(0xFF2C2C2C);
   static const Color darkAccent    = Color(0xFF4ECDC4);
@@ -19,7 +16,6 @@ class AppColors {
   static const Color darkDisplay   = Color(0xFF1E1E1E);
 }
 
-// ─── Text Styles ──────────────────────────────────────────────────────────────
 class AppTextStyles {
   static const String fontFamily = 'Roboto';
 
@@ -42,7 +38,6 @@ class AppTextStyles {
   );
 }
 
-// ─── Layout ───────────────────────────────────────────────────────────────────
 class AppLayout {
   static const double buttonSpacing    = 12.0;
   static const double buttonRadius     = 16.0;
@@ -52,7 +47,6 @@ class AppLayout {
   static const int    animModeMs      = 300;
 }
 
-// ─── Storage Keys ─────────────────────────────────────────────────────────────
 class StorageKeys {
   static const String history      = 'calculation_history';
   static const String theme        = 'theme_mode';

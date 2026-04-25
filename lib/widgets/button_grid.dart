@@ -1,4 +1,3 @@
-// lib/widgets/button_grid.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -28,7 +27,6 @@ class ButtonGrid extends StatelessWidget {
   }
 }
 
-// ─── Helper to build a grid of buttons ───────────────────────────────────────
 
 class _ButtonGrid extends StatelessWidget {
   final List<List<_BtnDef>> rows;
@@ -43,10 +41,8 @@ class _ButtonGrid extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Scale spacing down for grids with many rows so buttons always fit.
         final effectiveSpacing = (spacing * (5 / numRows)).clamp(4.0, spacing);
         final totalSpacing = effectiveSpacing * numRows;
-        // No minimum clamp — let buttons shrink freely to prevent overflow.
         final buttonHeight = ((constraints.maxHeight - totalSpacing) / numRows)
             .clamp(0.0, 80.0);
 
@@ -97,7 +93,6 @@ class _BtnDef {
   });
 }
 
-// ─── Basic Mode ───────────────────────────────────────────────────────────────
 
 class _BasicGrid extends StatelessWidget {
   const _BasicGrid({super.key});
@@ -134,7 +129,6 @@ class _BasicGrid extends StatelessWidget {
   }
 }
 
-// ─── Scientific Mode ──────────────────────────────────────────────────────────
 
 class _ScientificGrid extends StatelessWidget {
   const _ScientificGrid({super.key});
@@ -192,7 +186,6 @@ class _ScientificGrid extends StatelessWidget {
   }
 }
 
-// ─── Programmer Mode ──────────────────────────────────────────────────────────
 
 class _ProgrammerGrid extends StatelessWidget {
   const _ProgrammerGrid({super.key});

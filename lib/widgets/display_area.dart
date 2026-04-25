@@ -1,4 +1,3 @@
-// lib/widgets/display_area.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +15,6 @@ class DisplayArea extends StatelessWidget {
     final displayBg = isDark ? AppColors.darkDisplay : AppColors.lightDisplay;
 
     return GestureDetector(
-      // Swipe right to delete last char
       onHorizontalDragEnd: (details) {
         if (details.primaryVelocity != null && details.primaryVelocity! > 0) {
           calc.onButton('DEL');
@@ -39,7 +37,6 @@ class DisplayArea extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // Indicators row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -53,7 +50,6 @@ class DisplayArea extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // Expression (scrollable)
             if (calc.expression.isNotEmpty)
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -66,7 +62,6 @@ class DisplayArea extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 4),
-            // Main display
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               reverse: true,
@@ -84,7 +79,6 @@ class DisplayArea extends StatelessWidget {
                 ),
               ),
             ),
-            // Programmer mode representations
             if (calc.mode.name == 'programmer') ...[
               const SizedBox(height: 8),
               _progRow('BIN', calc.binaryDisplay, isDark),

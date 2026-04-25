@@ -1,6 +1,3 @@
-// lib/models/calculator_mode.dart
-
-/// The three calculator modes supported by the app.
 enum CalculatorMode {
   basic,
   scientific,
@@ -18,7 +15,6 @@ enum CalculatorMode {
   }
 }
 
-/// Angle unit used for trigonometric calculations.
 enum AngleMode {
   degrees,
   radians;

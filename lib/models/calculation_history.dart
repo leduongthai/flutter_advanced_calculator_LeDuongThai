@@ -1,8 +1,6 @@
-// lib/models/calculation_history.dart
 
 import 'dart:convert';
 
-/// Represents a single calculation entry stored in history.
 class CalculationHistory {
   final String expression;
   final String result;

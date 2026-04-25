@@ -1,6 +1,3 @@
-// lib/providers/calculator_provider.dart
-
-import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../models/calculation_history.dart';
 import '../models/calculator_mode.dart';
@@ -14,22 +11,20 @@ class CalculatorProvider extends ChangeNotifier {
     _load();
   }
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  String _expr     = '';
-  String _display  = '0';
-  String _lastRes  = '';
-  bool   _newNum   = true;
-  bool   _hasError = false;
-  bool   _show2nd  = false;
-  double _memory   = 0.0;
-  bool   _hasMem   = false;
+  String _expr       = '';
+  String _display    = '0';
+  String _lastRes    = '';
+  bool   _justEvaled = false;
+  bool   _hasError   = false;
+  bool   _show2nd    = false;
+  double _memory     = 0.0;
+  bool   _hasMem     = false;
   CalculatorMode     _mode     = CalculatorMode.basic;
   CalculatorSettings _settings = const CalculatorSettings();
   List<CalculationHistory> _history = [];
   String _progBase = 'DEC';
   int    _progVal  = 0;
 
-  // ── Getters ───────────────────────────────────────────────────────────────
   String get display       => _display;
   String get expression    => _expr;
   String get lastResult    => _lastRes;
@@ -46,7 +41,6 @@ class CalculatorProvider extends ChangeNotifier {
   String get octalDisplay  => _progVal.toRadixString(8).toUpperCase();
   String get hexDisplay    => _progVal.toRadixString(16).toUpperCase();
 
-  // ── Load persisted state ──────────────────────────────────────────────────
   void _load() {
     _history = _storage.loadHistory();
     _memory  = _storage.loadMemory();
@@ -62,231 +56,271 @@ class CalculatorProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
   String _fmt(double v) =>
       CalculatorLogic.formatResult(v, precision: _settings.decimalPrecision);
 
-  void _setVal(double v) {
-    _display = _fmt(v);
-    _newNum  = true;
+  void _syncDisplay() {
+    _display = _expr.isEmpty ? '0' : _expr;
   }
 
-  void _appendDigit(String d) {
-    if (_newNum || _display == '0') {
-      _display = d;
-      _newNum  = false;
+  bool get _endsWithOp {
+    if (_expr.isEmpty) return true;
+    final last = _expr[_expr.length - 1];
+    return '+-×÷^*/%(&|'.contains(last);
+  }
+
+  bool get _endsWithValue {
+    if (_expr.isEmpty) return false;
+    final last = _expr[_expr.length - 1];
+    return RegExp(r'[\d).πe]').hasMatch(last);
+  }
+
+  void _replaceTrailingOp(String newOp) {
+    if (_expr.isNotEmpty && '+-×÷^'.contains(_expr[_expr.length - 1])) {
+      _expr = _expr.substring(0, _expr.length - 1) + newOp;
     } else {
-      _display += d;
-    }
-  }
-
-  void _appendOp(String op) {
-    _expr   += _display + op;
-    _newNum  = true;
-  }
-
-  void _appendFn(String fn) {
-    _expr    += '$fn(';
-    _display  = '$fn(';
-    _newNum   = true;
-  }
-
-  void _applyUnary(double Function(double) fn) {
-    final v = double.tryParse(_display) ?? 0;
-    try {
-      _setVal(fn(v));
-    } catch (_) {
-      _display  = 'Error';
-      _hasError = true;
+      _expr += newOp;
     }
   }
 
   double _fact(int n) {
-    if (n < 0 || n > 20) throw FormatException('Invalid factorial');
+    if (n < 0 || n > 170) throw FormatException('Invalid factorial');
     double r = 1;
-    for (int i = 2; i <= n; i++) {
-      r *= i;
-    }
+    for (int i = 2; i <= n; i++) r *= i;
     return r;
   }
 
   void _compute() {
-    final full = _expr + _display;
-    if (full.isEmpty) return;
+    if (_expr.isEmpty) return;
+    final open    = '('.allMatches(_expr).length;
+    final close   = ')'.allMatches(_expr).length;
+    final toClose = open - close;
+    final full    = _expr + (toClose > 0 ? ')' * toClose : '');
     try {
       final res = CalculatorLogic.evaluate(full, angleMode: _settings.angleMode);
       final fmt = _fmt(res);
-      _history.insert(
-        0,
-        CalculationHistory(
-          expression: full,
-          result:     fmt,
-          timestamp:  DateTime.now(),
-        ),
-      );
+      _history.insert(0, CalculationHistory(
+        expression: full,
+        result:     fmt,
+        timestamp:  DateTime.now(),
+      ));
       if (_history.length > _settings.historySize) {
         _history = _history.sublist(0, _settings.historySize);
       }
       _storage.saveHistory(_history);
-      _lastRes = _display;
-      _display = fmt;
-      _expr    = '';
-      _newNum  = true;
-      if (_mode == CalculatorMode.programmer) {
-        _progVal = res.toInt();
-      }
+      _lastRes    = fmt;
+      _display    = fmt;
+      _expr       = fmt;
+      _justEvaled = true;
+      if (_mode == CalculatorMode.programmer) _progVal = res.toInt();
     } catch (_) {
-      _display  = 'Error';
-      _hasError = true;
-      _newNum   = true;
+      _display    = 'Error';
+      _hasError   = true;
+      _expr       = '';
+      _justEvaled = true;
     }
   }
 
   void _switchBase(String base) {
-    _progVal  = (double.tryParse(_display) ?? _progVal.toDouble()).toInt();
+    _progVal  = (double.tryParse(_expr) ?? _progVal.toDouble()).toInt();
     _progBase = base;
-    if (base == 'BIN') {
-      _display = _progVal.toRadixString(2);
-    } else if (base == 'OCT') {
-      _display = _progVal.toRadixString(8);
-    } else if (base == 'HEX') {
-      _display = _progVal.toRadixString(16).toUpperCase();
-    } else {
-      _display = _progVal.toString();
+    switch (base) {
+      case 'BIN': _expr = _progVal.toRadixString(2); break;
+      case 'OCT': _expr = _progVal.toRadixString(8); break;
+      case 'HEX': _expr = _progVal.toRadixString(16).toUpperCase(); break;
+      default:    _expr = _progVal.toString();
     }
-    _newNum = true;
+    _justEvaled = true;
+    _syncDisplay();
   }
 
-  // ── Main button handler ───────────────────────────────────────────────────
   void onButton(String label) {
     _hasError = false;
 
     if (label == 'C') {
-      _expr = ''; _display = '0'; _lastRes = ''; _newNum = true;
-    } else if (label == 'CE') {
-      _display = '0'; _newNum = true;
-    } else if (label == '±') {
-      if (_display != '0') {
-        _display = _display.startsWith('-')
-            ? _display.substring(1)
-            : '-$_display';
-      }
-    } else if (label == '.') {
-      if (_newNum) {
-        _display = '0.'; _newNum = false;
-      } else if (!_display.contains('.')) {
-        _display += '.';
-      }
-    } else if (label == 'DEL') {
-      if (_display.length > 1) {
-        _display = _display.substring(0, _display.length - 1);
-      } else {
-        _display = '0'; _newNum = true;
-      }
-    } else if (label == '=') {
-      _compute();
-    } else if (label == '+' || label == '-' || label == '×' ||
-               label == '÷' || label == '^') {
-      _appendOp(label);
-    } else if (label == '%') {
-      _setVal((double.tryParse(_display) ?? 0) / 100);
-    } else if (label == '(') {
-      // If there's a pending number, flush it with implicit multiply
-      if (!_newNum && _display != '0') {
-        _expr += _display + '*';
-      }
-      _expr   += '(';
-      _display = '(';
-      _newNum  = true;
-    } else if (label == ')') {
-      // Flush current display value into expr before closing
-      if (!_newNum) {
-        _expr += _display;
-      }
-      _expr   += ')';
-      _display = ')';
-      _newNum  = true;
-    } else if (label == 'π') {
-      _setVal(math.pi);
-    } else if (label == 'e') {
-      _setVal(math.e);
-    } else if (label == 'x²') {
-      _applyUnary((x) => x * x);
-    } else if (label == 'x³') {
-      _applyUnary((x) => x * x * x);
-    } else if (label == '√') {
-      _applyUnary((x) {
-        if (x < 0) throw FormatException('sqrt of negative');
-        return math.sqrt(x);
-      });
-    } else if (label == '∛') {
-      _applyUnary((x) => math.pow(x, 1 / 3).toDouble());
-    } else if (label == '1/x') {
-      _applyUnary((x) {
-        if (x == 0) throw FormatException('division by zero');
-        return 1 / x;
-      });
-    } else if (label == 'n!') {
-      _applyUnary((x) => _fact(x.toInt()));
-    } else if (label == 'Ln') {
-      _applyUnary((x) {
-        if (x <= 0) throw FormatException('ln domain error');
-        return math.log(x);
-      });
-    } else if (label == 'log') {
-      _applyUnary((x) {
-        if (x <= 0) throw FormatException('log domain error');
-        return math.log(x) / math.ln10;
-      });
-    } else if (label == 'log₂') {
-      _applyUnary((x) {
-        if (x <= 0) throw FormatException('log₂ domain error');
-        return math.log(x) / math.log2e;
-      });
-    } else if (label == 'sin'  || label == 'cos'  || label == 'tan' ||
-               label == 'asin' || label == 'acos' || label == 'atan') {
-      _appendFn(label);
-    } else if (label == '2nd') {
-      _show2nd = !_show2nd;
-      notifyListeners();
-      return;
-    } else if (label == 'MC') {
-      _memory = 0; _hasMem = false; _storage.saveMemory(0);
-    } else if (label == 'MR') {
-      _setVal(_memory);
-    } else if (label == 'M+') {
-      _memory += double.tryParse(_display) ?? 0;
-      _hasMem  = true;
-      _storage.saveMemory(_memory);
-    } else if (label == 'M-') {
-      _memory -= double.tryParse(_display) ?? 0;
-      _hasMem  = true;
-      _storage.saveMemory(_memory);
-    } else if (label == 'DEC' || label == 'BIN' ||
-               label == 'OCT' || label == 'HEX') {
-      _switchBase(label);
-    } else if (label == 'AND') {
-      _appendOp('&');
-    } else if (label == 'OR') {
-      _appendOp('|');
-    } else if (label == 'XOR') {
-      _appendOp('^');
-    } else if (label == 'NOT') {
-      _setVal((~(int.tryParse(_display) ?? 0)).toDouble());
-    } else if (label == '<<') {
-      _appendOp('<<');
-    } else if (label == '>>') {
-      _appendOp('>>');
-    } else if (label == 'HEX_C') {
-      _appendDigit('C');
-    } else {
-      _appendDigit(label);
+      _expr = ''; _display = '0'; _lastRes = ''; _justEvaled = false;
+      notifyListeners(); return;
     }
+
+    if (label == 'CE') {
+      if (_expr.isNotEmpty) {
+        _expr = _expr.replaceFirst(RegExp(r'[\d.]+$'), '');
+      }
+      _justEvaled = false;
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    if (label == '2nd') {
+      _show2nd = !_show2nd;
+      notifyListeners(); return;
+    }
+
+    if (label == 'DEL') {
+      if (_justEvaled) {
+        _expr = ''; _justEvaled = false;
+      } else if (_expr.isNotEmpty) {
+        _expr = _expr.substring(0, _expr.length - 1);
+      }
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    if (label == '=') {
+      _compute();
+      notifyListeners(); return;
+    }
+
+    if (_justEvaled) {
+      final isOp = '+-×÷^'.contains(label) && label.length == 1;
+      if (!isOp) _expr = '';
+      _justEvaled = false;
+    }
+
+    if (RegExp(r'^[0-9A-F]$').hasMatch(label) || label == 'HEX_C') {
+      _expr += (label == 'HEX_C' ? 'C' : label);
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    if (label == '.') {
+      final lastNum = RegExp(r'[\d.]+$').stringMatch(_expr) ?? '';
+      if (!lastNum.contains('.')) {
+        if (_expr.isEmpty || _endsWithOp) _expr += '0';
+        _expr += '.';
+      }
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    if (label == '±') {
+      final m = RegExp(r'(-?\d+\.?\d*)$').firstMatch(_expr);
+      if (m != null) {
+        final num     = m.group(1)!;
+        final negated = num.startsWith('-') ? num.substring(1) : '-$num';
+        _expr = _expr.substring(0, m.start) + negated;
+      } else if (_expr.isEmpty) {
+        _expr = '-';
+      }
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    if ('+-×÷^'.contains(label) && label.length == 1) {
+      if (_expr.isEmpty) {
+        if (label == '-') _expr = '-';
+      } else {
+        _replaceTrailingOp(label);
+      }
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    if (label == '%') {
+      if (_endsWithValue) _expr += '%';
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    if (label == '(') {
+      if (_endsWithValue) _expr += '×';
+      _expr += '(';
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    if (label == ')') {
+      final open  = '('.allMatches(_expr).length;
+      final close = ')'.allMatches(_expr).length;
+      if (open > close) {
+        _expr += ')';
+        _syncDisplay();
+      }
+      notifyListeners(); return;
+    }
+
+    if (label == 'π' || label == 'e') {
+      if (_endsWithValue) _expr += '×';
+      _expr += label;
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    const fnLabels = <String, String>{
+      'sin': 'sin', 'cos': 'cos', 'tan': 'tan',
+      'asin': 'asin', 'acos': 'acos', 'atan': 'atan',
+      '√': 'sqrt', '∛': 'cbrt',
+      'Ln': 'ln', 'log': 'log', 'log₂': 'log2',
+    };
+    if (fnLabels.containsKey(label)) {
+      if (_endsWithValue) _expr += '×';
+      _expr += '${fnLabels[label]}(';
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+
+    if (label == 'x²' || label == 'x³' || label == '1/x' || label == 'n!') {
+      if (_expr.isEmpty) { notifyListeners(); return; }
+      try {
+        final cur = CalculatorLogic.evaluate(_expr, angleMode: _settings.angleMode);
+        final res = switch (label) {
+          'x²'  => cur * cur,
+          'x³'  => cur * cur * cur,
+          '1/x' => 1.0 / cur,
+          'n!'  => _fact(cur.toInt()),
+          _     => cur,
+        };
+        _expr    = _fmt(res);
+        _display = _expr;
+      } catch (_) {
+        _display  = 'Error';
+        _hasError = true;
+      }
+      notifyListeners(); return;
+    }
+
+    if (label == 'MC') {
+      _memory = 0; _hasMem = false; _storage.saveMemory(0);
+      notifyListeners(); return;
+    }
+    if (label == 'MR') {
+      if (_endsWithValue) _expr += '×';
+      _expr += _fmt(_memory);
+      _syncDisplay();
+      notifyListeners(); return;
+    }
+    if (label == 'M+' || label == 'M-') {
+      try {
+        final v = CalculatorLogic.evaluate(
+          _expr.isNotEmpty ? _expr : '0', angleMode: _settings.angleMode);
+        if (label == 'M+') _memory += v; else _memory -= v;
+        _hasMem = true;
+        _storage.saveMemory(_memory);
+      } catch (_) {}
+      notifyListeners(); return;
+    }
+
+    if (label == 'DEC' || label == 'BIN' || label == 'OCT' || label == 'HEX') {
+      _switchBase(label); notifyListeners(); return;
+    }
+    if (label == 'AND') { _replaceTrailingOp('&');  _syncDisplay(); notifyListeners(); return; }
+    if (label == 'OR')  { _replaceTrailingOp('|');  _syncDisplay(); notifyListeners(); return; }
+    if (label == 'XOR') { _replaceTrailingOp('^');  _syncDisplay(); notifyListeners(); return; }
+    if (label == 'NOT') {
+      try {
+        final v = CalculatorLogic.evaluate(
+          _expr.isNotEmpty ? _expr : '0', angleMode: _settings.angleMode);
+        _expr = _fmt((~v.toInt()).toDouble());
+        _syncDisplay();
+      } catch (_) { _display = 'Error'; _hasError = true; }
+      notifyListeners(); return;
+    }
+    if (label == '<<') { _replaceTrailingOp('<<'); _syncDisplay(); notifyListeners(); return; }
+    if (label == '>>') { _replaceTrailingOp('>>'); _syncDisplay(); notifyListeners(); return; }
 
     notifyListeners();
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────
   void clearHistory() {
     _history = [];
     _storage.clearHistory();
@@ -294,9 +328,9 @@ class CalculatorProvider extends ChangeNotifier {
   }
 
   void useHistoryEntry(CalculationHistory e) {
-    _display = e.result;
-    _expr    = '';
-    _newNum  = true;
+    _expr       = e.result;
+    _display    = e.result;
+    _justEvaled = true;
     notifyListeners();
   }
 

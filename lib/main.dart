@@ -1,4 +1,3 @@
-// lib/main.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,14 +9,12 @@ import 'services/storage_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialise storage before providers need it
   final storage = StorageService();
   await storage.init();
 
   runApp(
     MultiProvider(
       providers: [
-        // ThemeProvider must come before CalculatorProvider
         ChangeNotifierProvider(create: (_) => ThemeProvider(storage)),
         ChangeNotifierProvider(create: (_) => CalculatorProvider(storage)),
       ],

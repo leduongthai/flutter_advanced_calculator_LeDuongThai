@@ -60,6 +60,7 @@ class CalculatorLogic {
         if (x < 0) throw FormatException('sqrt of negative');
         return math.sqrt(x);
       },
+
       'cbrt':  (x) => x < 0 ? -math.pow(-x, 1 / 3).toDouble() : math.pow(x, 1 / 3).toDouble(),
       'abs':   (x) => x.abs(),
       'ceil':  (x) => x.ceilToDouble(),
@@ -227,6 +228,7 @@ class CalculatorLogic {
   static int bitwiseNot(int a)        => ~a;
   static int shiftLeft(int a, int n)  => a << n;
   static int shiftRight(int a, int n) => a >> n;
+
 
   static String formatResult(double value, {int precision = 10}) {
     if (value.isNaN) return 'Error';

@@ -1,5 +1,3 @@
-// lib/screens/calculator_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/calculator_provider.dart';
@@ -82,21 +80,17 @@ class CalculatorScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Mode selector (fixed height) ────────────────────────
                 const ModeSelector(),
                 const SizedBox(height: 8),
 
-                // ── Display (intrinsic height, not expanded) ────────────
                 const DisplayArea(),
                 const SizedBox(height: 8),
 
-                // ── History preview (fixed, only shown when not empty) ───
                 if (calc.history.isNotEmpty) ...[
                   _HistoryPreview(calc: calc),
                   const SizedBox(height: 8),
                 ],
 
-                // ── Button grid fills all remaining space ───────────────
                 const Expanded(child: ButtonGrid()),
               ],
             ),
@@ -107,7 +101,6 @@ class CalculatorScreen extends StatelessWidget {
   }
 }
 
-// ─── Swipeable history preview strip ─────────────────────────────────────────
 
 class _HistoryPreview extends StatelessWidget {
   final CalculatorProvider calc;

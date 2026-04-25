@@ -1,8 +1,3 @@
-// test/calculator_provider_test.dart
-//
-// Tests for CalculatorProvider button logic (state machine).
-// Uses a real StorageService backed by a fresh SharedPreferences instance
-// provided by the flutter_test in-memory mock.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,7 +5,6 @@ import 'package:advanced_calculator/models/calculator_mode.dart';
 import 'package:advanced_calculator/providers/calculator_provider.dart';
 import 'package:advanced_calculator/services/storage_service.dart';
 
-// ─── Helper ──────────────────────────────────────────────────────────────────
 
 Future<CalculatorProvider> _makeProvider() async {
   SharedPreferences.setMockInitialValues({});
@@ -23,7 +17,6 @@ void _press(CalculatorProvider c, List<String> buttons) {
   for (final b in buttons) c.onButton(b);
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

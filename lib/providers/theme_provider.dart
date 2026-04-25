@@ -1,5 +1,3 @@
-// lib/providers/theme_provider.dart
-
 import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
@@ -22,7 +20,6 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Light Theme ──────────────────────────────────────────────────────────
   static ThemeData get lightTheme => ThemeData(
         brightness: Brightness.light,
         scaffoldBackgroundColor: AppColors.lightBg,
@@ -35,7 +32,6 @@ class ThemeProvider extends ChangeNotifier {
         useMaterial3: true,
       );
 
-  // ─── Dark Theme ───────────────────────────────────────────────────────────
   static ThemeData get darkTheme => ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.darkBg,

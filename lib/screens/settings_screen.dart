@@ -1,4 +1,3 @@
-// lib/screens/settings_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -18,7 +17,6 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
-          // ── Theme ──────────────────────────────────────────────────────
           _sectionHeader('Appearance'),
           ListTile(
             title: const Text('Theme'),
@@ -32,7 +30,6 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
 
-          // ── Calculation ────────────────────────────────────────────────
           _sectionHeader('Calculation'),
           ListTile(
             title: const Text('Decimal Precision'),
@@ -60,7 +57,6 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
 
-          // ── History ────────────────────────────────────────────────────
           _sectionHeader('History'),
           ListTile(
             title: const Text('History Size'),
@@ -78,7 +74,6 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => _confirmClear(context, calc),
           ),
 
-          // ── Feedback ───────────────────────────────────────────────────
           _sectionHeader('Feedback'),
           SwitchListTile(
             title: const Text('Haptic Feedback'),
